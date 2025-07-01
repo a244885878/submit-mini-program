@@ -4,6 +4,7 @@ import Router from "koa-router";
 import bodyParser from "koa-bodyparser";
 import cors from "koa-cors";
 import { userRoutes } from "./routes";
+import { errorHandler } from "./utils/error-handler";
 
 // 加载环境变量
 dotenv.config({ path: `.env.${process.env.NODE_ENV || "development"}` });
@@ -14,6 +15,7 @@ const router = new Router();
 // 中间件
 app.use(cors());
 app.use(bodyParser());
+app.use(errorHandler);
 
 // 路由
 app.use(userRoutes.routes());
