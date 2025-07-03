@@ -13,7 +13,12 @@ const app = new Koa();
 const router = new Router();
 
 // 中间件
-app.use(cors());
+app.use(
+  cors({
+    origin: "*",
+    credentials: true,
+  })
+);
 app.use(bodyParser());
 app.use(errorHandler);
 

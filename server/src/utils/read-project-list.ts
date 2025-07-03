@@ -10,6 +10,10 @@ export function getAllSubProjectInfo(): Array<{
   name: string;
   version: string;
   orgName: string;
+  appid: string;
+  privateKeyPath: string;
+  devPath: string;
+  buildPath: string;
 }> {
   const desktopDir = path.join(os.homedir(), "Desktop");
 
@@ -37,6 +41,10 @@ export function getAllSubProjectInfo(): Array<{
     name: string;
     version: string;
     orgName: string;
+    appid: string;
+    privateKeyPath: string;
+    devPath: string;
+    buildPath: string;
   }> = [];
 
   for (const parentDir of parentDirs) {
@@ -65,13 +73,64 @@ export function getAllSubProjectInfo(): Array<{
         const version = pkg.version || "";
 
         let orgName = "";
+        let appid = "";
+        let privateKeyPath = "";
+        let devPath = "";
+        let buildPath = "";
+
+        // 读取 .env.development 文件
         if (fs.existsSync(envPath)) {
           const envRaw = fs.readFileSync(envPath, "utf-8");
-          const match = envRaw.match(/^VITE_ORG_NAME\s*=\s*(.+)$/m);
-          orgName = match ? match[1].trim() : "";
+
+          // 读取 VITE_ORG_NAME
+          const orgMatch = envRaw.match(/^VITE_ORG_NAME\s*=\s*(.+)$/m);
+          orgName = orgMatch ? orgMatch[1].trim() : "";
+
+          // 读取 VITE_WECHAT_APP_ID
+          const appidMatch = envRaw.match(/^VITE_WECHAT_APP_ID\s*=\s*(.+)$/m);
+          appid = appidMatch ? appidMatch[1].trim() : "";
         }
 
-        results.push({ projectPath, name, version, orgName });
+        // 查找 private.xxxxxxx.key 文件
+        try {
+          const files = fs.readdirSync(projectPath);
+          const privateKeyFile = files.find(
+            (file) => file.startsWith("private.") && file.endsWith(".key")
+          );
+          if (privateKeyFile) {
+            privateKeyPath = path.join(projectPath, privateKeyFile);
+          }
+        } catch (err) {
+          console.warn(`查找private key文件失败: ${projectPath}`, err);
+        }
+
+        // 检查 dev 目录路径 (dist/dev/mp-weixin)
+        const devDirPath = path.join(projectPath, "dist", "dev", "mp-weixin");
+        if (fs.existsSync(devDirPath)) {
+          devPath = devDirPath;
+        }
+
+        // 检查 pro 目录路径 (dist/build/mp-weixin)
+        const buildDirPath = path.join(
+          projectPath,
+          "dist",
+          "build",
+          "mp-weixin"
+        );
+        if (fs.existsSync(buildDirPath)) {
+          buildPath = buildDirPath;
+        }
+
+        results.push({
+          projectPath,
+          name,
+          version,
+          orgName,
+          appid,
+          privateKeyPath,
+          devPath,
+          buildPath,
+        });
       } catch (err) {
         console.warn(`读取失败: ${projectPath}`, err);
       }
