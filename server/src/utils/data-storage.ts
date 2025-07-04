@@ -1,15 +1,24 @@
 import path from "path";
 import fs from "fs";
 import { getGitInfo } from "./git-info";
+import { MiniProgramType } from "../constants/enum";
 
 // 数据文件路径
-const DATA_FILE_PATH = path.join(__dirname, "../../data/upload_records.json");
+const getDataFilePath = (type: string = MiniProgramType.CloudOutpatientMp) => {
+  const fileName =
+    type === MiniProgramType.CloudMallMp
+      ? "mall_upload_records.json"
+      : "upload_records.json";
+  return path.join(__dirname, "../../data", fileName);
+};
 
 // 确保数据目录存在
-const dataDir = path.dirname(DATA_FILE_PATH);
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
+const ensureDataDir = (type: string = MiniProgramType.CloudOutpatientMp) => {
+  const dataDir = path.dirname(getDataFilePath(type));
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+};
 
 // 数据结构
 interface UploadRecord {
@@ -24,11 +33,12 @@ interface UploadRecord {
   version: string;
   errorMessage?: string; // 错误信息字段，仅在失败时存在
   created_at: string;
+  type: string; // 新增type字段
 }
 
-// 内存中的数据
-let records: UploadRecord[] = [];
-let nextId = 1;
+// 内存中的数据 - 为每种类型维护独立的数据
+const recordsMap: Record<string, UploadRecord[]> = {};
+const nextIdMap: Record<string, number> = {};
 
 /**
  * 格式化时间为 YYYY-MM-DD HH:MM:SS 格式
@@ -50,33 +60,38 @@ function formatDateTime(date: Date | string): string {
 /**
  * 从文件加载数据
  */
-function loadData(): void {
+function loadData(type: string = MiniProgramType.CloudOutpatientMp): void {
   try {
-    if (fs.existsSync(DATA_FILE_PATH)) {
-      const data = fs.readFileSync(DATA_FILE_PATH, "utf-8");
+    const dataFilePath = getDataFilePath(type);
+    if (fs.existsSync(dataFilePath)) {
+      const data = fs.readFileSync(dataFilePath, "utf-8");
       const parsed = JSON.parse(data);
-      records = parsed.records || [];
-      nextId = parsed.nextId || 1;
+      recordsMap[type] = parsed.records || [];
+      nextIdMap[type] = parsed.nextId || 1;
+    } else {
+      recordsMap[type] = [];
+      nextIdMap[type] = 1;
     }
   } catch (error) {
-    console.error("加载数据失败:", error);
-    records = [];
-    nextId = 1;
+    console.error(`加载数据失败 (${type}):`, error);
+    recordsMap[type] = [];
+    nextIdMap[type] = 1;
   }
 }
 
 /**
  * 保存数据到文件
  */
-function saveData(): void {
+function saveData(type: string = MiniProgramType.CloudOutpatientMp): void {
   try {
+    const dataFilePath = getDataFilePath(type);
     const data = {
-      records,
-      nextId,
+      records: recordsMap[type] || [],
+      nextId: nextIdMap[type] || 1,
     };
-    fs.writeFileSync(DATA_FILE_PATH, JSON.stringify(data, null, 2));
+    fs.writeFileSync(dataFilePath, JSON.stringify(data, null, 2));
   } catch (error) {
-    console.error("保存数据失败:", error);
+    console.error(`保存数据失败 (${type}):`, error);
   }
 }
 
@@ -88,6 +103,7 @@ function saveData(): void {
  * @param status 上传状态 (success/fail)
  * @param version 版本号
  * @param errorMessage 错误信息（仅在失败时）
+ * @param type 小程序类型
  */
 export async function recordUpload(
   name: string,
@@ -95,15 +111,24 @@ export async function recordUpload(
   mode: "test" | "pro",
   status: "success" | "fail",
   version: string,
-  errorMessage?: string
+  errorMessage?: string,
+  type: string = MiniProgramType.CloudOutpatientMp
 ): Promise<void> {
   try {
+    // 确保数据目录存在
+    ensureDataDir(type);
+
+    // 确保数据已加载
+    if (!recordsMap[type]) {
+      loadData(type);
+    }
+
     // 获取 Git 信息
     const gitInfo = await getGitInfo();
 
     // 创建记录
     const record: UploadRecord = {
-      id: nextId++,
+      id: nextIdMap[type]++,
       name,
       orgName,
       lastCommitUser: gitInfo.lastCommitUser,
@@ -114,15 +139,19 @@ export async function recordUpload(
       version,
       errorMessage: status === "fail" ? errorMessage : undefined,
       created_at: formatDateTime(new Date()),
+      type,
     };
 
     // 添加到内存
-    records.unshift(record); // 添加到开头，最新的在前面
+    if (!recordsMap[type]) {
+      recordsMap[type] = [];
+    }
+    recordsMap[type].unshift(record); // 添加到开头，最新的在前面
 
     // 保存到文件
-    saveData();
+    saveData(type);
 
-    console.log(`上传记录已保存: ${name} - ${status}`);
+    console.log(`上传记录已保存: ${name} - ${status} (${type})`);
   } catch (error) {
     console.error("保存上传记录失败:", error);
     throw error;
@@ -131,32 +160,50 @@ export async function recordUpload(
 
 /**
  * 获取上传记录总数
+ * @param type 小程序类型
  * @returns number
  */
-export function getUploadRecordsCount(): number {
-  return records.length;
+export function getUploadRecordsCount(
+  type: string = MiniProgramType.CloudOutpatientMp
+): number {
+  if (!recordsMap[type]) {
+    loadData(type);
+  }
+  return (recordsMap[type] || []).length;
 }
 
 /**
  * 获取上传记录列表
  * @param limit 限制返回数量，默认 50
  * @param offset 偏移量，默认 0
+ * @param type 小程序类型
  * @returns Array
  */
 export function getUploadRecords(
   limit: number = 50,
-  offset: number = 0
+  offset: number = 0,
+  type: string = MiniProgramType.CloudOutpatientMp
 ): UploadRecord[] {
-  return records.slice(offset, offset + limit);
+  if (!recordsMap[type]) {
+    loadData(type);
+  }
+  return (recordsMap[type] || []).slice(offset, offset + limit);
 }
 
 /**
  * 根据项目名称获取上传记录
  * @param name 项目名称
+ * @param type 小程序类型
  * @returns Array
  */
-export function getUploadRecordsByName(name: string): UploadRecord[] {
-  return records.filter((record) => record.name === name);
+export function getUploadRecordsByName(
+  name: string,
+  type: string = MiniProgramType.CloudOutpatientMp
+): UploadRecord[] {
+  if (!recordsMap[type]) {
+    loadData(type);
+  }
+  return (recordsMap[type] || []).filter((record) => record.name === name);
 }
 
 /**
@@ -167,5 +214,6 @@ export function closeDatabase(): void {
   console.log("数据已保存到文件");
 }
 
-// 初始化时加载数据
-loadData();
+// 初始化时加载默认数据
+loadData(MiniProgramType.CloudOutpatientMp);
+loadData(MiniProgramType.CloudMallMp);

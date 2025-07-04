@@ -3,6 +3,7 @@ import { promisify } from "util";
 import path from "path";
 import os from "os";
 import fs from "fs";
+import { MiniProgramType } from "../constants/enum";
 
 const execAsync = promisify(exec);
 
@@ -44,19 +45,18 @@ function directoryExists(dirPath: string): boolean {
 
 /**
  * 拉取代码的方法
- * 进入桌面 code/taozi/cloud-outpatient-mp 目录，执行git pull命令
+ * 进入桌面 code/taozi/cloud-outpatient-mp 或 cloud-mall-mp 目录，执行git pull命令
+ * @param type 小程序类型，默认为 cloud-outpatient-mp
  * @returns Promise<void> 成功返回Promise.resolve，失败返回Promise.reject
  */
-export async function pullCode(): Promise<void> {
+export async function pullCode(
+  type: string = MiniProgramType.CloudOutpatientMp
+): Promise<void> {
   try {
     // 构建目标目录路径（跨平台兼容）
     const desktopPath = getDesktopPath();
-    const targetDir = path.join(
-      desktopPath,
-      "code",
-      "taozi",
-      "cloud-outpatient-mp"
-    );
+    const projectName = type;
+    const targetDir = path.join(desktopPath, "code", "taozi", projectName);
 
     // 检查目录是否存在
     if (!directoryExists(targetDir)) {
@@ -75,27 +75,26 @@ export async function pullCode(): Promise<void> {
       throw new Error(`Git pull failed: ${stderr}`);
     }
 
-    console.log("Git pull successful:", stdout);
+    console.log(`Git pull successful (${type}):`, stdout);
     return Promise.resolve();
   } catch (error) {
-    console.error("Git pull failed:", error);
+    console.error(`Git pull failed (${type}):`, error);
     return Promise.reject(error);
   }
 }
 
 /**
  * 检查目录是否存在并且是git仓库
+ * @param type 小程序类型，默认为 cloud-outpatient-mp
  * @returns Promise<boolean>
  */
-export async function checkGitRepository(): Promise<boolean> {
+export async function checkGitRepository(
+  type: string = MiniProgramType.CloudOutpatientMp
+): Promise<boolean> {
   try {
     const desktopPath = getDesktopPath();
-    const targetDir = path.join(
-      desktopPath,
-      "code",
-      "taozi",
-      "cloud-outpatient-mp"
-    );
+    const projectName = type;
+    const targetDir = path.join(desktopPath, "code", "taozi", projectName);
 
     // 检查目录是否存在
     if (!directoryExists(targetDir)) {
@@ -113,7 +112,7 @@ export async function checkGitRepository(): Promise<boolean> {
     return true;
   } catch (error) {
     console.error(
-      "Not a valid git repository or directory does not exist:",
+      `Not a valid git repository or directory does not exist (${type}):`,
       error
     );
     return false;

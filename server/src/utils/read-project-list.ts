@@ -1,11 +1,15 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { MiniProgramType } from "../constants/enum";
 
 /**
  * 获取指定目录下的所有子项目的 package.json 和 .env.development 的信息
+ * @param type 小程序类型，默认为 cloud-outpatient-mp
  */
-export function getAllSubProjectInfo(): Array<{
+export function getAllSubProjectInfo(
+  type: string = MiniProgramType.CloudOutpatientMp
+): Array<{
   projectPath: string;
   name: string;
   version: string;
@@ -17,24 +21,49 @@ export function getAllSubProjectInfo(): Array<{
 }> {
   const desktopDir = path.join(os.homedir(), "Desktop");
 
-  const parentDirs = [
-    path.join(
-      desktopDir,
-      "code",
-      "taozi",
-      "cloud-outpatient-mp",
-      "apps",
-      "cloud-outpatient"
-    ),
-    path.join(
-      desktopDir,
-      "code",
-      "taozi",
-      "cloud-outpatient-mp",
-      "apps",
-      "internet-hospital"
-    ),
-  ];
+  // 根据type确定项目路径
+  let parentDirs: string[];
+
+  if (type === MiniProgramType.CloudMallMp) {
+    parentDirs = [
+      path.join(
+        desktopDir,
+        "code",
+        "taozi",
+        MiniProgramType.CloudMallMp,
+        "apps",
+        "cloud-mall"
+      ),
+      path.join(
+        desktopDir,
+        "code",
+        "taozi",
+        MiniProgramType.CloudMallMp,
+        "apps",
+        "internet-mall"
+      ),
+    ];
+  } else {
+    // 默认 cloud-outpatient-mp
+    parentDirs = [
+      path.join(
+        desktopDir,
+        "code",
+        "taozi",
+        MiniProgramType.CloudOutpatientMp,
+        "apps",
+        "cloud-outpatient"
+      ),
+      path.join(
+        desktopDir,
+        "code",
+        "taozi",
+        MiniProgramType.CloudOutpatientMp,
+        "apps",
+        "internet-hospital"
+      ),
+    ];
+  }
 
   const results: Array<{
     projectPath: string;

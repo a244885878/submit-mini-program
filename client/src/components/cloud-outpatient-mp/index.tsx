@@ -24,7 +24,7 @@ import {
 } from "../../api";
 
 import { CloudUploadOutlined } from "@ant-design/icons";
-import { UploadStatus } from "../../constants/enum";
+import { UploadStatus, MiniProgramType } from "../../constants/enum";
 
 type Form = {
   mode: "test" | "pro";
@@ -32,8 +32,14 @@ type Form = {
   version?: string;
 };
 
+interface CloudOutpatientMpProps {
+  type?: string;
+}
+
 // 表格列表
-const List: React.FC = () => {
+const List: React.FC<CloudOutpatientMpProps> = ({
+  type = MiniProgramType.CloudOutpatientMp,
+}) => {
   let timer: unknown = null;
   const [loading, setLoading] = useState(false);
   const [list, setList] = useState<CloudOutpatientMpList>([]);
@@ -44,7 +50,7 @@ const List: React.FC = () => {
 
   // 获取上传状态
   const getUploadStatuses = () => {
-    requestGetUploadStatuses().then((res) => {
+    requestGetUploadStatuses(type).then((res) => {
       setUploadStatus(res);
       res.forEach((item) => {
         if (item.status === UploadStatus.Success) {
@@ -71,7 +77,7 @@ const List: React.FC = () => {
           const nextItem = newAwaitList.shift()!;
           console.log(`开始上传等待队列中的项目: ${nextItem}`);
           // 立即执行上传
-          requestUploadMiniProgram(nextItem, form.mode);
+          requestUploadMiniProgram(nextItem, form.mode, type);
         }
 
         return newAwaitList;
@@ -90,7 +96,7 @@ const List: React.FC = () => {
   useEffect(() => {
     setLoading(true);
     // 获取小程序列表
-    requestGetCloudOutpatientMpList()
+    requestGetCloudOutpatientMpList(type)
       .then((res) => {
         setList(res);
         // 设置表单初始值
@@ -107,7 +113,7 @@ const List: React.FC = () => {
     return () => {
       clearInterval(timer as number);
     };
-  }, []);
+  }, [type]);
 
   // 上传
   const handleUpload = async (name: string, mode: Form["mode"]) => {
@@ -126,7 +132,7 @@ const List: React.FC = () => {
         return;
       }
       console.log(`直接上传: ${name}，当前构建中: ${buildingCount}个`);
-      requestUploadMiniProgram(name, mode);
+      requestUploadMiniProgram(name, mode, type);
       getUploadStatuses();
     } catch (error) {
       console.log("表单校验失败:", error);
@@ -305,7 +311,9 @@ const List: React.FC = () => {
 };
 
 // 上传记录
-const Records: React.FC = () => {
+const Records: React.FC<CloudOutpatientMpProps> = ({
+  type = MiniProgramType.CloudOutpatientMp,
+}) => {
   const [list, setList] = useState<UploadRecord[]>([]);
   const [pagination, setPagination] = useState<{
     page: number;
@@ -401,7 +409,7 @@ const Records: React.FC = () => {
     const currentPage = page ?? pagination.page;
     const currentSize = size ?? pagination.size;
     setLoading(true);
-    requestGetUploadRecords(currentPage, currentSize)
+    requestGetUploadRecords(currentPage, currentSize, type)
       .then((res) => {
         setList(res.list as UploadRecord[]);
         setPagination({
@@ -417,7 +425,7 @@ const Records: React.FC = () => {
 
   useEffect(() => {
     getRecords();
-  }, []);
+  }, [type]);
 
   return (
     <>
@@ -445,11 +453,13 @@ const Records: React.FC = () => {
   );
 };
 
-const CloudOutpatientMp: React.FC = () => {
+const CloudOutpatientMp: React.FC<CloudOutpatientMpProps> = ({
+  type = MiniProgramType.CloudOutpatientMp,
+}) => {
   const [currentTab, setCurrentTab] = useState<string>("1");
   const items = [
-    { key: "1", label: "小程序列表", component: <List /> },
-    { key: "2", label: "上传记录", component: <Records /> },
+    { key: "1", label: "小程序列表", component: <List type={type} /> },
+    { key: "2", label: "上传记录", component: <Records type={type} /> },
   ];
 
   return (

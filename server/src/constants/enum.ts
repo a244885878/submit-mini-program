@@ -27,3 +27,14 @@ export enum UploadStatus {
    */
   Fail = "fail",
 }
+
+export enum MiniProgramType {
+  /**
+   * 云门诊患者端小程序
+   */
+  CloudOutpatientMp = "cloud-outpatient-mp",
+  /**
+   * 云商城小程序
+   */
+  CloudMallMp = "cloud-mall-mp",
+}

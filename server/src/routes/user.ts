@@ -1,6 +1,6 @@
 import Router from "koa-router";
 import { getAllSubProjectInfo } from "../utils/read-project-list";
-import { ResponseCode, UploadStatus } from "../constants/enum";
+import { ResponseCode, UploadStatus, MiniProgramType } from "../constants/enum";
 import * as ci from "miniprogram-ci";
 import { buildMiniProgram } from "../utils/pack";
 import { pullCode } from "../utils/pull-code";
@@ -16,11 +16,20 @@ const userRoutes = new Router({
   prefix: "/api/users", // 路由前缀
 });
 
-// 上传任务队列
-let uploadList: { name: string; status: UploadStatus }[] = [];
+// 上传任务队列 - 为每种类型维护独立的队列
+const uploadListMap: Record<string, { name: string; status: UploadStatus }[]> =
+  {
+    [MiniProgramType.CloudOutpatientMp]: [],
+    [MiniProgramType.CloudMallMp]: [],
+  };
 
 // 更新上传状态的函数
-const updateUploadStatus = (name: string, status: UploadStatus) => {
+const updateUploadStatus = (
+  name: string,
+  status: UploadStatus,
+  type: string = MiniProgramType.CloudOutpatientMp
+) => {
+  const uploadList = uploadListMap[type] || [];
   const uploadIndex = uploadList.findIndex((item) => item.name === name);
   if (uploadIndex !== -1) {
     uploadList[uploadIndex].status = status;
@@ -29,7 +38,11 @@ const updateUploadStatus = (name: string, status: UploadStatus) => {
 
 // 获取项目列表
 userRoutes.get("/get-project-list", async (ctx) => {
-  const info = getAllSubProjectInfo();
+  const { type = MiniProgramType.CloudOutpatientMp } = ctx.query as unknown as {
+    type?: string;
+  };
+
+  const info = getAllSubProjectInfo(type);
   ctx.body = {
     code: ResponseCode.Success,
     message: "success",
@@ -39,13 +52,20 @@ userRoutes.get("/get-project-list", async (ctx) => {
 
 // 获取上传状态列表
 userRoutes.get("/get-upload-statuses", async (ctx) => {
+  const { type = MiniProgramType.CloudOutpatientMp } = ctx.query as unknown as {
+    type?: string;
+  };
+
+  const uploadList = uploadListMap[type] || [];
+
   ctx.body = {
     code: ResponseCode.Success,
     message: "success",
     data: uploadList,
   };
+
   // 如果有成功的状态，则移除
-  uploadList = uploadList.filter(
+  uploadListMap[type] = uploadList.filter(
     (item) => item.status !== UploadStatus.Success
   );
 });
@@ -57,10 +77,12 @@ userRoutes.get("/get-upload-records", async (ctx) => {
       page = 1,
       size = 20,
       name,
+      type = MiniProgramType.CloudOutpatientMp,
     } = ctx.query as unknown as {
       page?: number;
       size?: number;
       name?: string;
+      type?: string;
     };
 
     // 计算偏移量
@@ -70,11 +92,11 @@ userRoutes.get("/get-upload-records", async (ctx) => {
     let total = 0;
 
     if (name) {
-      records = getUploadRecordsByName(name);
+      records = getUploadRecordsByName(name, type);
       total = records.length;
     } else {
-      records = getUploadRecords(size, offset);
-      total = getUploadRecordsCount();
+      records = getUploadRecords(size, offset, type);
+      total = getUploadRecordsCount(type);
     }
 
     ctx.body = {
@@ -101,9 +123,14 @@ userRoutes.get("/get-upload-records", async (ctx) => {
 // 上传小程序
 userRoutes.get("/upload-mini-program", async (ctx) => {
   try {
-    const { name, mode } = ctx.query as unknown as {
+    const {
+      name,
+      mode,
+      type = MiniProgramType.CloudOutpatientMp,
+    } = ctx.query as unknown as {
       name: string;
       mode: "test" | "pro";
+      type?: string;
     };
 
     if (!name || !mode) {
@@ -115,17 +142,23 @@ userRoutes.get("/upload-mini-program", async (ctx) => {
       return;
     }
 
+    // 获取对应类型的上传列表
+    const uploadList = uploadListMap[type] || [];
+
     // 检查是否正在存在该打包任务
     const existingUpload = uploadList.find((item) => item.name === name);
 
     // 如果失败了重新打包，状态设为Building
     if (existingUpload && existingUpload.status === UploadStatus.Fail) {
-      updateUploadStatus(name, UploadStatus.Building);
+      updateUploadStatus(name, UploadStatus.Building, type);
     }
 
     // 添加到打包列表，状态设为Building（只有在不是从pending状态转换过来的情况下才添加）
     if (!existingUpload) {
-      uploadList.push({ name, status: UploadStatus.Building });
+      if (!uploadListMap[type]) {
+        uploadListMap[type] = [];
+      }
+      uploadListMap[type].push({ name, status: UploadStatus.Building });
     }
 
     // 创建超时Promise（5分钟超时，包含打包和上传时间）
@@ -138,16 +171,16 @@ userRoutes.get("/upload-mini-program", async (ctx) => {
     // 创建整个上传流程的Promise
     const uploadProcessPromise = (async () => {
       // 每次拉取最新的代码
-      await pullCode();
+      await pullCode(type);
 
       // 执行打包
-      const result = await buildMiniProgram(name, mode);
+      const result = await buildMiniProgram(name, mode, type);
       if (!result.success) {
         throw new Error(result.error || "打包失败");
       }
 
       // 获取打包后的项目列表
-      const allInfo = getAllSubProjectInfo();
+      const allInfo = getAllSubProjectInfo(type);
       const target = allInfo.find((item) => item.name === name);
 
       if (!target) {
@@ -188,10 +221,18 @@ userRoutes.get("/upload-mini-program", async (ctx) => {
     const { uploadResult, target } = result;
 
     // 更新状态为成功
-    updateUploadStatus(name, UploadStatus.Success);
+    updateUploadStatus(name, UploadStatus.Success, type);
 
     // 记录上传成功记录
-    await recordUpload(name, target.orgName, mode, "success", target.version);
+    await recordUpload(
+      name,
+      target.orgName,
+      mode,
+      "success",
+      target.version,
+      undefined,
+      type
+    );
 
     ctx.body = {
       code: ResponseCode.Success,
@@ -202,14 +243,19 @@ userRoutes.get("/upload-mini-program", async (ctx) => {
     console.log(error);
 
     // 更新状态为失败
-    const { name, mode } = ctx.query as unknown as {
+    const {
+      name,
+      mode,
+      type = MiniProgramType.CloudOutpatientMp,
+    } = ctx.query as unknown as {
       name: string;
       mode: "test" | "pro";
+      type?: string;
     };
-    updateUploadStatus(name, UploadStatus.Fail);
+    updateUploadStatus(name, UploadStatus.Fail, type);
 
     // 记录上传失败记录
-    const allInfo = getAllSubProjectInfo();
+    const allInfo = getAllSubProjectInfo(type);
     const target = allInfo.find((item) => item.name === name);
     const errorMessage = error instanceof Error ? error.message : String(error);
     if (target) {
@@ -219,7 +265,8 @@ userRoutes.get("/upload-mini-program", async (ctx) => {
         mode,
         "fail",
         target.version,
-        errorMessage
+        errorMessage,
+        type
       );
     } else {
       await recordUpload(
@@ -228,7 +275,8 @@ userRoutes.get("/upload-mini-program", async (ctx) => {
         mode,
         "fail",
         "unknown",
-        errorMessage
+        errorMessage,
+        type
       );
     }
 

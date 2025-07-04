@@ -1,5 +1,5 @@
 import { request } from "./request";
-import { UploadStatus } from "../constants/enum";
+import { UploadStatus, MiniProgramType } from "../constants/enum";
 
 export type CloudOutpatientMpList = {
   projectPath: string;
@@ -30,38 +30,60 @@ export type UploadRecord = {
   version: string;
   created_at: string;
   errorMessage?: string;
+  type: string;
 };
 
 /**
- * 获取患者端小程序列表
+ * 获取小程序列表
+ * @param type 小程序类型，默认为 MiniProgramType.CloudOutpatientMp
  */
-export const requestGetCloudOutpatientMpList = () => {
-  return request.get<CloudOutpatientMpList>("/api/users/get-project-list");
+export const requestGetCloudOutpatientMpList = (
+  type: string = MiniProgramType.CloudOutpatientMp
+) => {
+  return request.get<CloudOutpatientMpList>("/api/users/get-project-list", {
+    params: { type },
+  });
 };
 
 /**
  * 获取上传状态列表
+ * @param type 小程序类型，默认为 MiniProgramType.CloudOutpatientMp
  */
-export const requestGetUploadStatuses = () => {
-  return request.get<UploadStatusItem[]>("/api/users/get-upload-statuses");
+export const requestGetUploadStatuses = (
+  type: string = MiniProgramType.CloudOutpatientMp
+) => {
+  return request.get<UploadStatusItem[]>("/api/users/get-upload-statuses", {
+    params: { type },
+  });
 };
 
 /**
  * 上传小程序
+ * @param name 项目名称
+ * @param mode 上传模式
+ * @param type 小程序类型，默认为 MiniProgramType.CloudOutpatientMp
  */
 export const requestUploadMiniProgram = (
   name: string,
-  mode: "test" | "pro"
+  mode: "test" | "pro",
+  type: string = MiniProgramType.CloudOutpatientMp
 ) => {
   return request.get("/api/users/upload-mini-program", {
-    params: { name, mode },
+    params: { name, mode, type },
   });
 };
 
 /**
  * 获取上传记录
+ * @param page 页码
+ * @param size 每页大小
+ * @param type 小程序类型，默认为 MiniProgramType.CloudOutpatientMp
  */
-export const requestGetUploadRecords = (page: number, size: number) => {
+export const requestGetUploadRecords = (
+  page: number,
+  size: number,
+  type: string = MiniProgramType.CloudOutpatientMp
+) => {
   return request.get<{
     list: unknown[];
     pagination: {
@@ -70,6 +92,6 @@ export const requestGetUploadRecords = (page: number, size: number) => {
       total: number;
     };
   }>("/api/users/get-upload-records", {
-    params: { page, size },
+    params: { page, size, type },
   });
 };

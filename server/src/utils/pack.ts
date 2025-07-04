@@ -3,6 +3,7 @@ import { spawn } from "child_process";
 import path from "path";
 import os from "os";
 import fs from "fs";
+import { MiniProgramType } from "../constants/enum";
 
 interface BuildResult {
   success: boolean;
@@ -12,15 +13,19 @@ interface BuildResult {
 
 export async function buildMiniProgram(
   name: string,
-  mode: "test" | "pro"
+  mode: "test" | "pro",
+  type: string = MiniProgramType.CloudOutpatientMp
 ): Promise<BuildResult> {
+  // 根据type确定项目路径
+  const projectName = type;
+
   // 使用 path.join 和 os.homedir() 确保跨平台兼容性
   const projectDir = path.join(
     os.homedir(),
     "Desktop",
     "code",
     "taozi",
-    "cloud-outpatient-mp"
+    projectName
   );
 
   // 检查项目目录是否存在
@@ -48,7 +53,9 @@ export async function buildMiniProgram(
     let timeoutId: NodeJS.Timeout | undefined;
 
     try {
-      console.log(`开始构建项目: ${name}, 模式: build, 环境: ${mode}`);
+      console.log(
+        `开始构建项目: ${name}, 模式: build, 环境: ${mode}, 类型: ${type}`
+      );
       console.log(`项目目录: ${projectDir}`);
 
       // 使用 Node.js 原生的 child_process.spawn
