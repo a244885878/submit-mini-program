@@ -293,11 +293,23 @@ const Records: React.FC = () => {
       dataIndex: "status",
       key: "status",
       minWidth: 150,
-      render: (text: string) => {
+      render: (text: string, record: UploadRecord) => {
         return (
-          <Tag color={text === UploadStatus.Success ? "green" : "red"}>
-            {text === UploadStatus.Success ? "成功" : "失败"}
-          </Tag>
+          <>
+            {text === UploadStatus.Fail ? (
+              <Tooltip
+                title={
+                  text === UploadStatus.Fail
+                    ? "失败原因：" + record.errorMessage || "未知原因"
+                    : ""
+                }
+              >
+                <Tag color="red">失败</Tag>
+              </Tooltip>
+            ) : (
+              <Tag color="green">成功</Tag>
+            )}
+          </>
         );
       },
     },

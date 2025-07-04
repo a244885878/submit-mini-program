@@ -22,6 +22,7 @@ interface UploadRecord {
   mode: "test" | "pro";
   status: "success" | "fail";
   version: string;
+  errorMessage?: string; // 错误信息字段，仅在失败时存在
   created_at: string;
 }
 
@@ -86,13 +87,15 @@ function saveData(): void {
  * @param mode 上传模式 (test/pro)
  * @param status 上传状态 (success/fail)
  * @param version 版本号
+ * @param errorMessage 错误信息（仅在失败时）
  */
 export async function recordUpload(
   name: string,
   orgName: string,
   mode: "test" | "pro",
   status: "success" | "fail",
-  version: string
+  version: string,
+  errorMessage?: string
 ): Promise<void> {
   try {
     // 获取 Git 信息
@@ -109,6 +112,7 @@ export async function recordUpload(
       mode,
       status,
       version,
+      errorMessage: status === "fail" ? errorMessage : undefined,
       created_at: formatDateTime(new Date()),
     };
 

@@ -128,54 +128,64 @@ userRoutes.get("/upload-mini-program", async (ctx) => {
       uploadList.push({ name, status: UploadStatus.Building });
     }
 
-    // 每次拉取最新的代码
-    await pullCode();
-
-    // 执行打包
-    const result = await buildMiniProgram(name, mode);
-    if (!result.success) {
-      updateUploadStatus(name, UploadStatus.Fail);
-      ctx.body = {
-        code: ResponseCode.Error,
-        message: result.error || "打包失败",
-        data: null,
-      };
-      return;
-    }
-
-    // 获取打包后的项目列表
-    const allInfo = getAllSubProjectInfo();
-    const target = allInfo.find((item) => item.name === name);
-
-    if (!target) {
-      // 更新状态为失败
-      updateUploadStatus(name, UploadStatus.Fail);
-
-      ctx.body = {
-        code: ResponseCode.Error,
-        message: `未找到项目：${name}`,
-        data: null,
-      };
-      return;
-    }
-
-    const project = new ci.Project({
-      appid: target.appid,
-      type: "miniProgram",
-      projectPath: target.buildPath,
-      privateKeyPath: target.privateKeyPath,
-      ignores: ["node_modules/**/*"],
+    // 创建超时Promise（5分钟超时，包含打包和上传时间）
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error("上传超时，请稍后重试"));
+      }, 5 * 60 * 1000); // 5分钟
     });
 
-    const uploadResult = await ci.upload({
-      project,
-      version: target.version,
-      desc: `ci上传-${mode === "test" ? "测试" : "正式"}环境`,
-      setting: {
-        minify: true,
-      },
-      robot: mode === "test" ? 1 : 2,
-    });
+    // 创建整个上传流程的Promise
+    const uploadProcessPromise = (async () => {
+      // 每次拉取最新的代码
+      await pullCode();
+
+      // 执行打包
+      const result = await buildMiniProgram(name, mode);
+      if (!result.success) {
+        throw new Error(result.error || "打包失败");
+      }
+
+      // 获取打包后的项目列表
+      const allInfo = getAllSubProjectInfo();
+      const target = allInfo.find((item) => item.name === name);
+
+      if (!target) {
+        throw new Error(`未找到项目：${name}`);
+      }
+
+      const project = new ci.Project({
+        appid: target.appid,
+        type: "miniProgram",
+        projectPath: target.buildPath,
+        privateKeyPath: target.privateKeyPath,
+        ignores: ["node_modules/**/*"],
+      });
+
+      // 执行上传
+      const uploadResult = await ci.upload({
+        project,
+        version: target.version,
+        desc: `ci上传-${mode === "test" ? "测试" : "正式"}环境`,
+        setting: {
+          minify: true,
+        },
+        robot: mode === "test" ? 1 : 2,
+      });
+
+      return { uploadResult, target };
+    })();
+
+    // 使用Promise.race实现超时控制
+    const result = (await Promise.race([
+      uploadProcessPromise,
+      timeoutPromise,
+    ])) as {
+      uploadResult: unknown;
+      target: ReturnType<typeof getAllSubProjectInfo>[0];
+    };
+
+    const { uploadResult, target } = result;
 
     // 更新状态为成功
     updateUploadStatus(name, UploadStatus.Success);
@@ -201,10 +211,25 @@ userRoutes.get("/upload-mini-program", async (ctx) => {
     // 记录上传失败记录
     const allInfo = getAllSubProjectInfo();
     const target = allInfo.find((item) => item.name === name);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     if (target) {
-      await recordUpload(name, target.orgName, mode, "fail", target.version);
+      await recordUpload(
+        name,
+        target.orgName,
+        mode,
+        "fail",
+        target.version,
+        errorMessage
+      );
     } else {
-      await recordUpload(name, "unknown", mode, "fail", "unknown");
+      await recordUpload(
+        name,
+        "unknown",
+        mode,
+        "fail",
+        "unknown",
+        errorMessage
+      );
     }
 
     ctx.body = {

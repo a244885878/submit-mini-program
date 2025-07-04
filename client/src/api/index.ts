@@ -29,6 +29,7 @@ export type UploadRecord = {
   status: "success" | "fail";
   version: string;
   created_at: string;
+  errorMessage?: string;
 };
 
 /**
