@@ -1,4 +1,15 @@
-import { Button, Form, Select, Skeleton, Tabs, Tag, App, Tooltip } from "antd";
+import {
+  Button,
+  Form,
+  Select,
+  Skeleton,
+  Tabs,
+  Tag,
+  App,
+  Tooltip,
+  Switch,
+  Input,
+} from "antd";
 import styles from "./index.module.scss";
 import { useState, useEffect } from "react";
 import MyTable from "../my-table";
@@ -17,6 +28,8 @@ import { UploadStatus } from "../../constants/enum";
 
 type Form = {
   mode: "test" | "pro";
+  updateVersion: boolean;
+  version?: string;
 };
 
 // 表格列表
@@ -27,6 +40,7 @@ const List: React.FC = () => {
   const [uploadStatus, setUploadStatus] = useState<UploadStatusItem[]>([]);
   const { message } = App.useApp();
   const [awaitList, setAwaitList] = useState<string[]>([]);
+  const [formInstance] = Form.useForm();
 
   // 获取上传状态
   const getUploadStatuses = () => {
@@ -79,6 +93,12 @@ const List: React.FC = () => {
     requestGetCloudOutpatientMpList()
       .then((res) => {
         setList(res);
+        // 设置表单初始值
+        if (res.length > 0) {
+          formInstance.setFieldsValue({
+            version: res[0]?.version,
+          });
+        }
       })
       .finally(() => {
         setLoading(false);
@@ -90,18 +110,28 @@ const List: React.FC = () => {
   }, []);
 
   // 上传
-  const handleUpload = (name: string, mode: Form["mode"]) => {
-    const buildingCount = uploadStatus.filter(
-      (item) => item.status === UploadStatus.Building
-    ).length;
-    if (buildingCount >= 3) {
-      console.log(`构建队列已满(${buildingCount}个)，将 ${name} 加入等待队列`);
-      setAwaitList((prev) => [...prev, name]);
-      return;
+  const handleUpload = async (name: string, mode: Form["mode"]) => {
+    try {
+      // 触发表单校验
+      await formInstance.validateFields();
+
+      const buildingCount = uploadStatus.filter(
+        (item) => item.status === UploadStatus.Building
+      ).length;
+      if (buildingCount >= 3) {
+        console.log(
+          `构建队列已满(${buildingCount}个)，将 ${name} 加入等待队列`
+        );
+        setAwaitList((prev) => [...prev, name]);
+        return;
+      }
+      console.log(`直接上传: ${name}，当前构建中: ${buildingCount}个`);
+      requestUploadMiniProgram(name, mode);
+      getUploadStatuses();
+    } catch (error) {
+      console.log("表单校验失败:", error);
+      message.error("请检查表单输入是否正确");
     }
-    console.log(`直接上传: ${name}，当前构建中: ${buildingCount}个`);
-    requestUploadMiniProgram(name, mode);
-    getUploadStatuses();
   };
 
   const columns = [
@@ -186,6 +216,8 @@ const List: React.FC = () => {
   ];
   const [form, setForm] = useState<Form>({
     mode: "test",
+    updateVersion: false,
+    version: undefined,
   });
 
   return (
@@ -195,14 +227,16 @@ const List: React.FC = () => {
       ) : (
         <>
           <Form
+            form={formInstance}
             name="basic"
             initialValues={{
               mode: "test",
+              updateVersion: false,
             }}
             autoComplete="off"
             layout="inline"
           >
-            <Form.Item label="分支" name="branch" rules={[{ required: true }]}>
+            <Form.Item label="分支" name="branch">
               <span style={{ color: "#999" }}>development</span>
             </Form.Item>
             <Form.Item
@@ -213,9 +247,48 @@ const List: React.FC = () => {
               <Select
                 options={uploadEnvOptions}
                 style={{ width: 150 }}
-                onChange={(value) => setForm({ ...form, mode: value })}
+                onChange={(value) => {
+                  setForm({ ...form, mode: value });
+                  formInstance.setFieldsValue({ mode: value });
+                }}
               />
             </Form.Item>
+            <Form.Item label="更新版本号" name="updateVersion">
+              <Switch
+                onChange={(checked) => {
+                  setForm({ ...form, updateVersion: checked });
+                  formInstance.setFieldsValue({ updateVersion: checked });
+                }}
+              />
+            </Form.Item>
+            {form.updateVersion && (
+              <Form.Item
+                label="版本号"
+                name="version"
+                rules={[
+                  { required: true, message: "请输入版本号" },
+                  {
+                    pattern: /^\d+\.\d+\.\d+$/,
+                    message: "版本号格式必须为 x.y.z，如 2.5.0",
+                  },
+                ]}
+              >
+                <Input
+                  placeholder="请输入版本号"
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setForm({
+                      ...form,
+                      version: value,
+                    });
+                    // 同步到表单实例
+                    formInstance.setFieldsValue({
+                      version: value,
+                    });
+                  }}
+                />
+              </Form.Item>
+            )}
           </Form>
           <MyTable
             style={{ marginTop: 10 }}
