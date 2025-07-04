@@ -1,5 +1,5 @@
 // build-mini-program.ts
-import { execa } from "execa";
+import { spawn } from "child_process";
 import path from "path";
 import os from "os";
 import fs from "fs";
@@ -42,7 +42,7 @@ export async function buildMiniProgram(
     };
   }
 
-  return new Promise<BuildResult>((resolve, reject) => {
+  return new Promise<BuildResult>((resolve) => {
     let output = "";
     let processExited = false;
     let timeoutId: NodeJS.Timeout | undefined;
@@ -51,9 +51,8 @@ export async function buildMiniProgram(
       console.log(`开始构建项目: ${name}, 模式: build, 环境: ${mode}`);
       console.log(`项目目录: ${projectDir}`);
 
-      // 使用命令行参数直接调用，避免交互式问答
-      // 参数格式: node script.js projectName build env
-      const subprocess = execa(
+      // 使用 Node.js 原生的 child_process.spawn
+      const subprocess = spawn(
         "node",
         [
           "./packages/script/launch/index.js",
@@ -63,9 +62,7 @@ export async function buildMiniProgram(
         ],
         {
           cwd: projectDir,
-          stdin: "pipe",
-          stdout: "pipe",
-          stderr: "pipe",
+          stdio: ["pipe", "pipe", "pipe"],
           env: { ...process.env, FORCE_COLOR: "1" },
         }
       );
@@ -73,8 +70,13 @@ export async function buildMiniProgram(
       // 设置超时时间（10分钟）
       timeoutId = setTimeout(() => {
         if (!processExited) {
-          subprocess.kill("SIGTERM");
-          reject({
+          try {
+            subprocess.kill("SIGTERM");
+          } catch (err) {
+            console.error("终止进程失败:", err);
+          }
+          processExited = true;
+          resolve({
             success: false,
             output,
             error: "构建超时（10分钟）",
@@ -108,7 +110,7 @@ export async function buildMiniProgram(
             output,
           });
         } else {
-          reject({
+          resolve({
             success: false,
             output,
             error: `构建失败 - 退出代码: ${code}, 信号: ${signal}`,
@@ -123,7 +125,7 @@ export async function buildMiniProgram(
         }
 
         console.error("子进程启动错误:", error);
-        reject({
+        resolve({
           success: false,
           output,
           error: `子进程启动失败: ${error.message}`,
@@ -134,7 +136,7 @@ export async function buildMiniProgram(
         clearTimeout(timeoutId);
       }
       console.error("构建过程中发生错误:", err);
-      reject({
+      resolve({
         success: false,
         output,
         error: err?.message || "未知错误",

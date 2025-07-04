@@ -1,4 +1,4 @@
-import { Button, Form, Select, Skeleton, Tabs, Tag } from "antd";
+import { Button, Form, Select, Skeleton, Tabs, Tag, App } from "antd";
 import styles from "./index.module.scss";
 import { useState, useEffect } from "react";
 import MyTable from "../my-table";
@@ -7,10 +7,10 @@ import {
   requestGetUploadStatuses,
   requestUploadMiniProgram,
   type CloudOutpatientMpList,
-  type UploadStatus,
   type UploadStatusItem,
 } from "../../api";
 import { CloudUploadOutlined } from "@ant-design/icons";
+import { UploadStatus } from "../../constants/enum";
 
 type Form = {
   mode: "test" | "pro";
@@ -18,25 +18,56 @@ type Form = {
 
 // 表格列表
 const List: React.FC = () => {
+  let timer: unknown = null;
   const [loading, setLoading] = useState(false);
   const [list, setList] = useState<CloudOutpatientMpList>([]);
   const [uploadStatus, setUploadStatus] = useState<UploadStatusItem[]>([]);
-  const timer: unknown = null;
+  const { message } = App.useApp();
+  const [awaitList, setAwaitList] = useState<string[]>([]);
 
   // 获取上传状态
   const getUploadStatuses = () => {
     requestGetUploadStatuses().then((res) => {
       setUploadStatus(res);
+      res.forEach((item) => {
+        if (item.status === UploadStatus.Success) {
+          message.success(`${item.name}上传成功`);
+        }
+      });
+
+      // 处理等待队列
+      setAwaitList((currentAwaitList) => {
+        const newAwaitList = [...currentAwaitList];
+        const buildingCount = res.filter(
+          (item) => item.status === UploadStatus.Building
+        ).length;
+        const availableSlots = 3 - buildingCount;
+        const itemsToProcess = Math.min(availableSlots, newAwaitList.length);
+
+        if (itemsToProcess > 0) {
+          console.log(
+            `处理等待队列: 当前构建中=${buildingCount}个, 可用槽位=${availableSlots}, 处理项目数=${itemsToProcess}`
+          );
+        }
+
+        for (let i = 0; i < itemsToProcess; i++) {
+          const nextItem = newAwaitList.shift()!;
+          console.log(`开始上传等待队列中的项目: ${nextItem}`);
+          // 立即执行上传
+          requestUploadMiniProgram(nextItem, form.mode);
+        }
+
+        return newAwaitList;
+      });
     });
   };
 
   // 轮询获取上传状态
   const loopGetUploadStatus = () => {
     getUploadStatuses();
-    console.log("timer", timer);
-    // timer = setInterval(() => {
-    //   getUploadStatuses();
-    // }, 3000);
+    timer = setInterval(() => {
+      getUploadStatuses();
+    }, 2000);
   };
 
   useEffect(() => {
@@ -54,6 +85,21 @@ const List: React.FC = () => {
       clearInterval(timer as number);
     };
   }, []);
+
+  // 上传
+  const handleUpload = (name: string, mode: Form["mode"]) => {
+    const buildingCount = uploadStatus.filter(
+      (item) => item.status === UploadStatus.Building
+    ).length;
+    if (buildingCount >= 3) {
+      console.log(`构建队列已满(${buildingCount}个)，将 ${name} 加入等待队列`);
+      setAwaitList((prev) => [...prev, name]);
+      return;
+    }
+    console.log(`直接上传: ${name}，当前构建中: ${buildingCount}个`);
+    requestUploadMiniProgram(name, mode);
+    getUploadStatuses();
+  };
 
   const columns = [
     {
@@ -83,14 +129,11 @@ const List: React.FC = () => {
       key: "handle",
       width: 200,
       fixed: "right" as const,
-      render: (
-        value: unknown,
-        record: CloudOutpatientMpList[0],
-        index: number
-      ) => {
+      render: (value: unknown, record: CloudOutpatientMpList[0]) => {
         const status = uploadStatus.find(
-          (item) => item.index === index
+          (item) => item.name === record.name
         )?.status;
+
         const loading = (
           <Button type="primary" icon={<CloudUploadOutlined />} loading>
             上传中
@@ -105,7 +148,7 @@ const List: React.FC = () => {
           <Button
             type="primary"
             icon={<CloudUploadOutlined />}
-            onClick={() => requestUploadMiniProgram(record.name, form.mode)}
+            onClick={() => handleUpload(record.name, form.mode)}
           >
             上传
           </Button>
@@ -116,16 +159,16 @@ const List: React.FC = () => {
             color="danger"
             icon={<CloudUploadOutlined />}
             danger
-            onClick={() => requestUploadMiniProgram(record.name, form.mode)}
+            onClick={() => handleUpload(record.name, form.mode)}
           >
             上传失败
           </Button>
         );
 
         const returnStatus = (status: UploadStatus) => {
-          if (status === "loading") return loading;
-          if (status === "pending") return pending;
-          if (status === "fail") return fail;
+          if (awaitList.includes(record.name)) return pending;
+          if (status === UploadStatus.Building) return loading;
+          if (status === UploadStatus.Fail) return fail;
           return upload;
         };
 

@@ -1,4 +1,5 @@
 import { request } from "./request";
+import { UploadStatus } from "../constants/enum";
 
 export type CloudOutpatientMpList = {
   projectPath: string;
@@ -11,19 +12,9 @@ export type CloudOutpatientMpList = {
   buildPath: string;
 }[];
 
-export type UploadStatus =
-  | "complete"
-  | "loading"
-  | "fail"
-  | "success"
-  | "pending";
-
 export type UploadStatusItem = {
-  index: number;
   name: string;
   status: UploadStatus;
-  message?: string;
-  timestamp: number;
 };
 
 /**

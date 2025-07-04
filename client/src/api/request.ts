@@ -1,6 +1,7 @@
 import axios from "axios";
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 import { message } from "antd";
+import { ResponseCode } from "../constants/enum";
 
 export const baseURL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
@@ -42,7 +43,7 @@ instance.interceptors.response.use(
     const { data } = response;
 
     // 如果 code === 200，返回 data
-    if (data.code === 200) {
+    if (data.code === ResponseCode.Success) {
       return response;
     }
 
