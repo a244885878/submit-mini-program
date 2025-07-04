@@ -1,14 +1,17 @@
-import { Button, Form, Select, Skeleton, Tabs, Tag, App } from "antd";
+import { Button, Form, Select, Skeleton, Tabs, Tag, App, Tooltip } from "antd";
 import styles from "./index.module.scss";
 import { useState, useEffect } from "react";
 import MyTable from "../my-table";
 import {
   requestGetCloudOutpatientMpList,
+  requestGetUploadRecords,
   requestGetUploadStatuses,
   requestUploadMiniProgram,
   type CloudOutpatientMpList,
   type UploadStatusItem,
+  type UploadRecord,
 } from "../../api";
+
 import { CloudUploadOutlined } from "@ant-design/icons";
 import { UploadStatus } from "../../constants/enum";
 
@@ -230,7 +233,131 @@ const List: React.FC = () => {
 
 // 上传记录
 const Records: React.FC = () => {
-  return <div>上传记录</div>;
+  const [list, setList] = useState<UploadRecord[]>([]);
+  const [pagination, setPagination] = useState<{
+    page: number;
+    size: number;
+    total: number;
+  }>({
+    page: 1,
+    size: 20,
+    total: 0,
+  });
+  const [loading, setLoading] = useState(false);
+
+  const columns = [
+    {
+      title: "名称",
+      dataIndex: "name",
+      key: "name",
+      minWidth: 200,
+    },
+    {
+      title: "机构名称",
+      dataIndex: "orgName",
+      key: "orgName",
+      minWidth: 200,
+    },
+    {
+      title: "最后提交人",
+      dataIndex: "lastCommitUser",
+      key: "lastCommitUser",
+      width: 150,
+    },
+    {
+      title: "提交commit",
+      dataIndex: "commit",
+      key: "commit",
+      minWidth: 200,
+      ellipsis: true, // 省略显示
+      render: (text: string) => (
+        <Tooltip title={text}>
+          <span>{text}</span>
+        </Tooltip>
+      ),
+    },
+    {
+      title: "上传时间",
+      dataIndex: "uploadTime",
+      key: "uploadTime",
+      minWidth: 200,
+    },
+    {
+      title: "上传环境",
+      dataIndex: "mode",
+      key: "mode",
+      width: 150,
+    },
+    {
+      title: "上传状态",
+      dataIndex: "status",
+      key: "status",
+      minWidth: 150,
+      render: (text: string) => {
+        return (
+          <Tag color={text === UploadStatus.Success ? "green" : "red"}>
+            {text === UploadStatus.Success ? "成功" : "失败"}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: "上传版本号",
+      dataIndex: "version",
+      key: "version",
+      width: 150,
+      render: (text: string) => {
+        return <Tag color="blue">{text}</Tag>;
+      },
+    },
+  ];
+
+  const getRecords = (page?: number, size?: number) => {
+    const currentPage = page ?? pagination.page;
+    const currentSize = size ?? pagination.size;
+    setLoading(true);
+    requestGetUploadRecords(currentPage, currentSize)
+      .then((res) => {
+        setList(res.list as UploadRecord[]);
+        setPagination({
+          page: res.pagination.page,
+          size: res.pagination.size,
+          total: res.pagination.total,
+        });
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    getRecords();
+  }, []);
+
+  return (
+    <>
+      {loading ? (
+        <Skeleton active paragraph={{ rows: 20 }} />
+      ) : (
+        <MyTable
+          style={{ marginTop: 10 }}
+          columns={columns}
+          dataSource={list}
+          rowKey="id"
+          tableLayout="auto"
+          pagination={{
+            current: pagination.page,
+            pageSize: pagination.size,
+            total: pagination.total,
+            onChange: (page, size) => {
+              setPagination({ page, size, total: pagination.total });
+              getRecords(page, size);
+            },
+          }}
+        />
+      )}
+    </>
+  );
 };
 
 const CloudOutpatientMp: React.FC = () => {

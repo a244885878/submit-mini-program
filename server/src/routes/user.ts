@@ -4,6 +4,12 @@ import { ResponseCode, UploadStatus } from "../constants/enum";
 import * as ci from "miniprogram-ci";
 import { buildMiniProgram } from "../utils/pack";
 import { pullCode } from "../utils/pull-code";
+import {
+  recordUpload,
+  getUploadRecords,
+  getUploadRecordsByName,
+  getUploadRecordsCount,
+} from "../utils/data-storage";
 
 // 用户路由
 const userRoutes = new Router({
@@ -42,6 +48,54 @@ userRoutes.get("/get-upload-statuses", async (ctx) => {
   uploadList = uploadList.filter(
     (item) => item.status !== UploadStatus.Success
   );
+});
+
+// 获取上传记录列表
+userRoutes.get("/get-upload-records", async (ctx) => {
+  try {
+    const {
+      page = 1,
+      size = 20,
+      name,
+    } = ctx.query as unknown as {
+      page?: number;
+      size?: number;
+      name?: string;
+    };
+
+    // 计算偏移量
+    const offset = (page - 1) * size;
+
+    let records;
+    let total = 0;
+
+    if (name) {
+      records = getUploadRecordsByName(name);
+      total = records.length;
+    } else {
+      records = getUploadRecords(size, offset);
+      total = getUploadRecordsCount();
+    }
+
+    ctx.body = {
+      code: ResponseCode.Success,
+      message: "success",
+      data: {
+        list: records,
+        pagination: {
+          page,
+          size,
+          total,
+        },
+      },
+    };
+  } catch (error) {
+    ctx.body = {
+      code: ResponseCode.Error,
+      message: "获取上传记录失败",
+      data: null,
+    };
+  }
 });
 
 // 上传小程序
@@ -126,6 +180,9 @@ userRoutes.get("/upload-mini-program", async (ctx) => {
     // 更新状态为成功
     updateUploadStatus(name, UploadStatus.Success);
 
+    // 记录上传成功记录
+    await recordUpload(name, target.orgName, mode, "success", target.version);
+
     ctx.body = {
       code: ResponseCode.Success,
       message: "上传成功",
@@ -135,8 +192,20 @@ userRoutes.get("/upload-mini-program", async (ctx) => {
     console.log(error);
 
     // 更新状态为失败
-    const { name } = ctx.query as unknown as { name: string };
+    const { name, mode } = ctx.query as unknown as {
+      name: string;
+      mode: "test" | "pro";
+    };
     updateUploadStatus(name, UploadStatus.Fail);
+
+    // 记录上传失败记录
+    const allInfo = getAllSubProjectInfo();
+    const target = allInfo.find((item) => item.name === name);
+    if (target) {
+      await recordUpload(name, target.orgName, mode, "fail", target.version);
+    } else {
+      await recordUpload(name, "unknown", mode, "fail", "unknown");
+    }
 
     ctx.body = {
       code: ResponseCode.Error,

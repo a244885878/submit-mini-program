@@ -17,6 +17,20 @@ export type UploadStatusItem = {
   status: UploadStatus;
 };
 
+// 上传记录类型定义
+export type UploadRecord = {
+  id: number;
+  name: string;
+  orgName: string;
+  lastCommitUser: string;
+  commit: string;
+  uploadTime: string;
+  mode: "test" | "pro";
+  status: "success" | "fail";
+  version: string;
+  created_at: string;
+};
+
 /**
  * 获取患者端小程序列表
  */
@@ -40,5 +54,21 @@ export const requestUploadMiniProgram = (
 ) => {
   return request.get("/api/users/upload-mini-program", {
     params: { name, mode },
+  });
+};
+
+/**
+ * 获取上传记录
+ */
+export const requestGetUploadRecords = (page: number, size: number) => {
+  return request.get<{
+    list: unknown[];
+    pagination: {
+      page: number;
+      size: number;
+      total: number;
+    };
+  }>("/api/users/get-upload-records", {
+    params: { page, size },
   });
 };

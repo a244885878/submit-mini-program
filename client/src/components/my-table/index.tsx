@@ -57,13 +57,25 @@ function MyTableComponent<T extends object = object>(props: MyTableProps<T>) {
         ref={tableRef}
         style={{ minHeight: "300px" }}
       >
-        <Table<T>
-          {...props}
-          scroll={{
-            x: true,
-            y: headerHeight ? `calc(100% - ${headerHeight}px)` : "100%",
-          }}
-        />
+        {(() => {
+          const hasData = props.dataSource && props.dataSource.length > 0;
+          return (
+            <Table<T>
+              {...props}
+              scroll={
+                hasData
+                  ? {
+                      x: true,
+                      y: headerHeight
+                        ? `calc(100% - ${headerHeight}px)`
+                        : "100%",
+                    }
+                  : undefined
+              }
+              tableLayout={hasData ? "fixed" : undefined}
+            />
+          );
+        })()}
       </div>
     </ConfigProvider>
   );

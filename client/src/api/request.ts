@@ -16,7 +16,7 @@ interface ApiResponse<T = unknown> {
 // 创建 axios 实例
 const instance: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || baseURL,
-  timeout: 1000 * 60 * 30,
+  timeout: 1000 * 60 * 5,
   headers: {
     "Content-Type": "application/json",
   },
@@ -53,9 +53,28 @@ instance.interceptors.response.use(
   },
   (error) => {
     // 处理网络错误等
-    const errorMessage =
-      error.response?.data?.message || error.message || "网络错误";
-    message.error(errorMessage);
+    let errorMessage = "网络错误";
+
+    if (
+      error.code === "ECONNREFUSED" ||
+      error.message.includes("Network Error")
+    ) {
+      errorMessage = "服务器连接失败，请检查服务器是否正常运行";
+    } else if (error.response?.status === 500) {
+      errorMessage = "服务器内部错误，请稍后重试";
+    } else if (error.response?.status === 404) {
+      errorMessage = "请求的资源不存在";
+    } else if (error.response?.data?.message) {
+      errorMessage = error.response.data.message;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
+    // 只有在非静默模式下才显示错误消息
+    if (!error.config?.silent) {
+      message.error(errorMessage);
+    }
+
     return Promise.reject(error);
   }
 );
