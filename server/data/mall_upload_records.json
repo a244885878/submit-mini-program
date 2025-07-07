@@ -1,0 +1,44 @@
+{
+  "records": [
+    {
+      "id": 3,
+      "name": "@internet-hospital/hai-yi-kang",
+      "orgName": "海易康互联网医院健康商城",
+      "lastCommitUser": "liyao",
+      "commit": "ci更新版本号为2.5.0",
+      "uploadTime": "2025-07-07 16:57:19",
+      "mode": "test",
+      "status": "success",
+      "version": "2.2.0",
+      "created_at": "2025-07-07 16:57:19",
+      "type": "cloud-mall-mp"
+    },
+    {
+      "id": 2,
+      "name": "@internet-hospital/hai-ou",
+      "orgName": "成都康仁商城",
+      "lastCommitUser": "liyao",
+      "commit": "ci更新版本号为2.5.0",
+      "uploadTime": "2025-07-07 16:57:18",
+      "mode": "test",
+      "status": "success",
+      "version": "2.2.0",
+      "created_at": "2025-07-07 16:57:18",
+      "type": "cloud-mall-mp"
+    },
+    {
+      "id": 1,
+      "name": "@internet-hospital/hua-fu",
+      "orgName": "成都康仁健康商城",
+      "lastCommitUser": "liyao",
+      "commit": "ci更新版本号为2.5.0",
+      "uploadTime": "2025-07-07 16:57:16",
+      "mode": "test",
+      "status": "success",
+      "version": "2.2.0",
+      "created_at": "2025-07-07 16:57:16",
+      "type": "cloud-mall-mp"
+    }
+  ],
+  "nextId": 4
+}
