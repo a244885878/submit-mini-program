@@ -90,7 +90,7 @@ const List: React.FC<CloudOutpatientMpProps> = ({
     getUploadStatuses();
     timer = setInterval(() => {
       getUploadStatuses();
-    }, 2000);
+    }, 3000);
   };
 
   useEffect(() => {

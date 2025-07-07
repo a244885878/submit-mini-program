@@ -32,7 +32,7 @@ export function getAllSubProjectInfo(
         "taozi",
         MiniProgramType.CloudMallMp,
         "apps",
-        "cloud-mall"
+        "cloud-outpatient"
       ),
       path.join(
         desktopDir,
@@ -40,7 +40,7 @@ export function getAllSubProjectInfo(
         "taozi",
         MiniProgramType.CloudMallMp,
         "apps",
-        "internet-mall"
+        "internet-hospital"
       ),
     ];
   } else {
