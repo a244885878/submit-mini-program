@@ -9,6 +9,7 @@ import {
   Tooltip,
   Switch,
   Input,
+  Alert,
 } from "antd";
 import styles from "./index.module.scss";
 import { useState, useEffect } from "react";
@@ -41,7 +42,7 @@ const List: React.FC<CloudOutpatientMpProps> = ({
   type = MiniProgramType.CloudOutpatientMp,
 }) => {
   let timer: unknown = null;
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const [list, setList] = useState<CloudOutpatientMpList>([]);
   const [uploadStatus, setUploadStatus] = useState<UploadStatusItem[]>([]);
   const { message } = App.useApp();
@@ -90,7 +91,7 @@ const List: React.FC<CloudOutpatientMpProps> = ({
     getUploadStatuses();
     timer = setInterval(() => {
       getUploadStatuses();
-    }, 3000);
+    }, 4000);
   };
 
   useEffect(() => {
@@ -116,8 +117,17 @@ const List: React.FC<CloudOutpatientMpProps> = ({
   }, [type]);
 
   // 上传
-  const handleUpload = async (name: string, mode: Form["mode"]) => {
+  const handleUpload = async (
+    name: string,
+    mode: Form["mode"],
+    index: number
+  ) => {
     try {
+      setList((prev) => {
+        const newList = [...prev];
+        newList[index].loading = true;
+        return newList;
+      });
       // 触发表单校验
       await formInstance.validateFields();
 
@@ -132,11 +142,22 @@ const List: React.FC<CloudOutpatientMpProps> = ({
         return;
       }
       console.log(`直接上传: ${name}，当前构建中: ${buildingCount}个`);
-      requestUploadMiniProgram(name, mode, type);
+      // 是否需要更新版本号
+      if (form.updateVersion && form.version !== list[0].version) {
+        await requestUploadMiniProgram(name, mode, type, form.version);
+      } else {
+        await requestUploadMiniProgram(name, mode, type);
+      }
       getUploadStatuses();
     } catch (error) {
-      console.log("表单校验失败:", error);
-      message.error("请检查表单输入是否正确");
+      console.log("上传失败:", error);
+      message.error("上传失败:" + String(error));
+    } finally {
+      setList((prev) => {
+        const newList = [...prev];
+        newList[index].loading = false;
+        return newList;
+      });
     }
   };
 
@@ -168,7 +189,11 @@ const List: React.FC<CloudOutpatientMpProps> = ({
       key: "handle",
       width: 200,
       fixed: "right" as const,
-      render: (value: unknown, record: CloudOutpatientMpList[0]) => {
+      render: (
+        value: unknown,
+        record: CloudOutpatientMpList[0],
+        index: number
+      ) => {
         const status = uploadStatus.find(
           (item) => item.name === record.name
         )?.status;
@@ -187,9 +212,10 @@ const List: React.FC<CloudOutpatientMpProps> = ({
           <Button
             type="primary"
             icon={<CloudUploadOutlined />}
-            onClick={() => handleUpload(record.name, form.mode)}
+            onClick={() => handleUpload(record.name, form.mode, index)}
+            loading={record.loading}
           >
-            上传
+            {record.loading ? "请求中" : "上传"}
           </Button>
         );
         const fail = (
@@ -198,7 +224,7 @@ const List: React.FC<CloudOutpatientMpProps> = ({
             color="danger"
             icon={<CloudUploadOutlined />}
             danger
-            onClick={() => handleUpload(record.name, form.mode)}
+            onClick={() => handleUpload(record.name, form.mode, index)}
           >
             上传失败
           </Button>
@@ -296,6 +322,12 @@ const List: React.FC<CloudOutpatientMpProps> = ({
               </Form.Item>
             )}
           </Form>
+          <Alert
+            message="切换页面会初始化排队状态，上传时建议不要切换页面"
+            type="warning"
+            showIcon
+            style={{ marginTop: 10 }}
+          />
           <MyTable
             style={{ marginTop: 10 }}
             columns={columns}
@@ -337,7 +369,13 @@ const Records: React.FC<CloudOutpatientMpProps> = ({
       title: "机构名称",
       dataIndex: "orgName",
       key: "orgName",
-      minWidth: 200,
+      width: 200,
+      ellipsis: true, // 省略显示
+      render: (text: string) => (
+        <Tooltip title={text}>
+          <span>{text}</span>
+        </Tooltip>
+      ),
     },
     {
       title: "最后提交人",

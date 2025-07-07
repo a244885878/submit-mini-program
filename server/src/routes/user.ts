@@ -10,6 +10,7 @@ import {
   getUploadRecordsByName,
   getUploadRecordsCount,
 } from "../utils/data-storage";
+import { updateProjectVersions } from "../utils/update-version";
 
 // 用户路由
 const userRoutes = new Router({
@@ -41,6 +42,9 @@ userRoutes.get("/get-project-list", async (ctx) => {
   const { type = MiniProgramType.CloudOutpatientMp } = ctx.query as unknown as {
     type?: string;
   };
+
+  // 每次拉取最新的代码
+  await pullCode(type);
 
   const info = getAllSubProjectInfo(type);
   ctx.body = {
@@ -127,10 +131,12 @@ userRoutes.get("/upload-mini-program", async (ctx) => {
       name,
       mode,
       type = MiniProgramType.CloudOutpatientMp,
+      version,
     } = ctx.query as unknown as {
       name: string;
       mode: "test" | "pro";
       type?: string;
+      version?: string;
     };
 
     if (!name || !mode) {
@@ -140,6 +146,11 @@ userRoutes.get("/upload-mini-program", async (ctx) => {
         data: null,
       };
       return;
+    }
+
+    // 更新版本号
+    if (version) {
+      await updateProjectVersions(type, version);
     }
 
     // 获取对应类型的上传列表
@@ -170,9 +181,6 @@ userRoutes.get("/upload-mini-program", async (ctx) => {
 
     // 创建整个上传流程的Promise
     const uploadProcessPromise = (async () => {
-      // 每次拉取最新的代码
-      await pullCode(type);
-
       // 执行打包
       const result = await buildMiniProgram(name, mode, type);
       if (!result.success) {

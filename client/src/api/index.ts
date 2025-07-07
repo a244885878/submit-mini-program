@@ -10,6 +10,7 @@ export type CloudOutpatientMpList = {
   privateKeyPath: string;
   devPath: string;
   buildPath: string;
+  loading: boolean;
 }[];
 
 export type UploadStatusItem = {
@@ -66,10 +67,11 @@ export const requestGetUploadStatuses = (
 export const requestUploadMiniProgram = (
   name: string,
   mode: "test" | "pro",
-  type: string = MiniProgramType.CloudOutpatientMp
+  type: string = MiniProgramType.CloudOutpatientMp,
+  version?: string
 ) => {
   return request.get("/api/users/upload-mini-program", {
-    params: { name, mode, type },
+    params: { name, mode, type, version },
   });
 };
 

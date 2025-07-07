@@ -24,46 +24,10 @@ export function getAllSubProjectInfo(
   // 根据type确定项目路径
   let parentDirs: string[];
 
-  if (type === MiniProgramType.CloudMallMp) {
-    parentDirs = [
-      path.join(
-        desktopDir,
-        "code",
-        "taozi",
-        MiniProgramType.CloudMallMp,
-        "apps",
-        "cloud-outpatient"
-      ),
-      path.join(
-        desktopDir,
-        "code",
-        "taozi",
-        MiniProgramType.CloudMallMp,
-        "apps",
-        "internet-hospital"
-      ),
-    ];
-  } else {
-    // 默认 cloud-outpatient-mp
-    parentDirs = [
-      path.join(
-        desktopDir,
-        "code",
-        "taozi",
-        MiniProgramType.CloudOutpatientMp,
-        "apps",
-        "cloud-outpatient"
-      ),
-      path.join(
-        desktopDir,
-        "code",
-        "taozi",
-        MiniProgramType.CloudOutpatientMp,
-        "apps",
-        "internet-hospital"
-      ),
-    ];
-  }
+  parentDirs = [
+    path.join(desktopDir, "code", "taozi", type, "apps", "cloud-outpatient"),
+    path.join(desktopDir, "code", "taozi", type, "apps", "internet-hospital"),
+  ];
 
   const results: Array<{
     projectPath: string;
