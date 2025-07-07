@@ -124,6 +124,29 @@ userRoutes.get("/get-upload-records", async (ctx) => {
   }
 });
 
+// 更新版本号
+userRoutes.get("/update-version", async (ctx) => {
+  const { type = MiniProgramType.CloudOutpatientMp, version } =
+    ctx.query as unknown as {
+      type: string;
+      version?: string;
+    };
+  if (!version || !type) {
+    ctx.body = {
+      code: ResponseCode.Error,
+      message: "缺少必要参数 version 或 type",
+      data: null,
+    };
+    return;
+  }
+  await updateProjectVersions(type, version);
+  ctx.body = {
+    code: ResponseCode.Success,
+    message: "更新版本号成功",
+    data: null,
+  };
+});
+
 // 上传小程序
 userRoutes.get("/upload-mini-program", async (ctx) => {
   try {
@@ -131,7 +154,6 @@ userRoutes.get("/upload-mini-program", async (ctx) => {
       name,
       mode,
       type = MiniProgramType.CloudOutpatientMp,
-      version,
     } = ctx.query as unknown as {
       name: string;
       mode: "test" | "pro";
@@ -146,11 +168,6 @@ userRoutes.get("/upload-mini-program", async (ctx) => {
         data: null,
       };
       return;
-    }
-
-    // 更新版本号
-    if (version) {
-      await updateProjectVersions(type, version);
     }
 
     // 获取对应类型的上传列表

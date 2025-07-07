@@ -19,6 +19,7 @@ import {
   requestGetUploadRecords,
   requestGetUploadStatuses,
   requestUploadMiniProgram,
+  requestUpdateVersion,
   type CloudOutpatientMpList,
   type UploadStatusItem,
   type UploadRecord,
@@ -48,6 +49,8 @@ const List: React.FC<CloudOutpatientMpProps> = ({
   const { message } = App.useApp();
   const [awaitList, setAwaitList] = useState<string[]>([]);
   const [formInstance] = Form.useForm();
+  const [updateVersionLoading, setUpdateVersionLoading] =
+    useState<boolean>(false);
 
   // 获取上传状态
   const getUploadStatuses = () => {
@@ -77,8 +80,12 @@ const List: React.FC<CloudOutpatientMpProps> = ({
         for (let i = 0; i < itemsToProcess; i++) {
           const nextItem = newAwaitList.shift()!;
           console.log(`开始上传等待队列中的项目: ${nextItem}`);
-          // 立即执行上传
-          requestUploadMiniProgram(nextItem, form.mode, type);
+          // 立即执行上传，使用当前表单的mode
+          requestUploadMiniProgram(nextItem, form.mode, type).catch((error) => {
+            console.log(`队列项目上传失败: ${nextItem}`, error);
+            // 上传失败时，从等待队列中移除
+            setAwaitList((prev) => prev.filter((item) => item !== nextItem));
+          });
         }
 
         return newAwaitList;
@@ -94,28 +101,6 @@ const List: React.FC<CloudOutpatientMpProps> = ({
     }, 4000);
   };
 
-  useEffect(() => {
-    setLoading(true);
-    // 获取小程序列表
-    requestGetCloudOutpatientMpList(type)
-      .then((res) => {
-        setList(res);
-        // 设置表单初始值
-        if (res.length > 0) {
-          formInstance.setFieldsValue({
-            version: res[0]?.version,
-          });
-        }
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-    loopGetUploadStatus();
-    return () => {
-      clearInterval(timer as number);
-    };
-  }, [type]);
-
   // 上传
   const handleUpload = async (
     name: string,
@@ -128,30 +113,34 @@ const List: React.FC<CloudOutpatientMpProps> = ({
         newList[index].loading = true;
         return newList;
       });
-      // 触发表单校验
-      await formInstance.validateFields();
 
-      const buildingCount = uploadStatus.filter(
+      // 检查是否已在等待队列中
+      if (awaitList.includes(name)) {
+        console.log(`${name} 已在等待队列中，跳过重复请求`);
+        return;
+      }
+
+      // 先获取最新的上传状态，确保数据是最新的
+      const latestStatuses = await requestGetUploadStatuses(type);
+      const currentBuildingCount = latestStatuses.filter(
         (item) => item.status === UploadStatus.Building
       ).length;
-      if (buildingCount >= 3) {
+
+      if (currentBuildingCount >= 3) {
         console.log(
-          `构建队列已满(${buildingCount}个)，将 ${name} 加入等待队列`
+          `构建队列已满(${currentBuildingCount}个)，将 ${name} 加入等待队列`
         );
         setAwaitList((prev) => [...prev, name]);
         return;
       }
-      console.log(`直接上传: ${name}，当前构建中: ${buildingCount}个`);
-      // 是否需要更新版本号
-      if (form.updateVersion && form.version !== list[0].version) {
-        await requestUploadMiniProgram(name, mode, type, form.version);
-      } else {
-        await requestUploadMiniProgram(name, mode, type);
-      }
+
+      console.log(`直接上传: ${name}，当前构建中: ${currentBuildingCount}个`);
+      await requestUploadMiniProgram(name, mode, type);
       getUploadStatuses();
     } catch (error) {
       console.log("上传失败:", error);
-      message.error("上传失败:" + String(error));
+      // 上传失败时，从等待队列中移除（如果存在）
+      setAwaitList((prev) => prev.filter((item) => item !== name));
     } finally {
       setList((prev) => {
         const newList = [...prev];
@@ -160,6 +149,57 @@ const List: React.FC<CloudOutpatientMpProps> = ({
       });
     }
   };
+
+  // 更新版本号
+  const handleUpdateVersion = async () => {
+    try {
+      setUpdateVersionLoading(true);
+      if (form.version === list[0]?.version) {
+        message.warning("版本号不能与当前版本号相同");
+        return;
+      }
+      await formInstance.validateFields();
+      await requestUpdateVersion(type, form.version!);
+      getCloudOutpatientMpList();
+      message.success("更新版本号成功");
+    } catch (error) {
+      console.log("更新版本号失败:", error);
+    } finally {
+      setUpdateVersionLoading(false);
+    }
+  };
+
+  // 获取小程序列表
+  const getCloudOutpatientMpList = () => {
+    setLoading(true);
+    requestGetCloudOutpatientMpList(type)
+      .then((res) => {
+        setList(res);
+        // 设置默认版本号为列表第一项的版本号
+        if (res.length > 0 && res[0].version) {
+          setForm((prev) => ({
+            ...prev,
+            version: res[0].version,
+          }));
+          formInstance.setFieldsValue({
+            version: res[0].version,
+          });
+        }
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    getCloudOutpatientMpList();
+    loopGetUploadStatus();
+    return () => {
+      if (timer) {
+        clearInterval(timer as number);
+      }
+    };
+  }, []);
 
   const columns = [
     {
@@ -225,8 +265,9 @@ const List: React.FC<CloudOutpatientMpProps> = ({
             icon={<CloudUploadOutlined />}
             danger
             onClick={() => handleUpload(record.name, form.mode, index)}
+            loading={record.loading}
           >
-            上传失败
+            {record.loading ? "请求中" : "失败，重试"}
           </Button>
         );
 
@@ -267,63 +308,83 @@ const List: React.FC<CloudOutpatientMpProps> = ({
             }}
             autoComplete="off"
             layout="inline"
+            className={styles.form}
           >
-            <Form.Item label="分支" name="branch">
-              <span style={{ color: "#999" }}>development</span>
-            </Form.Item>
-            <Form.Item
-              label="上传环境"
-              name="mode"
-              rules={[{ required: true, message: "请选择上传环境" }]}
-            >
-              <Select
-                options={uploadEnvOptions}
-                style={{ width: 150 }}
-                onChange={(value) => {
-                  setForm({ ...form, mode: value });
-                  formInstance.setFieldsValue({ mode: value });
-                }}
-              />
-            </Form.Item>
-            <Form.Item label="更新版本号" name="updateVersion">
-              <Switch
-                onChange={(checked) => {
-                  setForm({ ...form, updateVersion: checked });
-                  formInstance.setFieldsValue({ updateVersion: checked });
-                }}
-              />
-            </Form.Item>
-            {form.updateVersion && (
+            <div className={styles.formItem}>
+              <Form.Item label="分支" name="branch">
+                <span style={{ color: "#999" }}>development</span>
+              </Form.Item>
               <Form.Item
-                label="版本号"
-                name="version"
-                rules={[
-                  { required: true, message: "请输入版本号" },
-                  {
-                    pattern: /^\d+\.\d+\.\d+$/,
-                    message: "版本号格式必须为 x.y.z，如 2.5.0",
-                  },
-                ]}
+                label="上传环境"
+                name="mode"
+                rules={[{ required: true, message: "请选择上传环境" }]}
               >
-                <Input
-                  placeholder="请输入版本号"
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setForm({
-                      ...form,
-                      version: value,
-                    });
-                    // 同步到表单实例
-                    formInstance.setFieldsValue({
-                      version: value,
-                    });
+                <Select
+                  options={uploadEnvOptions}
+                  style={{ width: 150 }}
+                  onChange={(value) => {
+                    setForm({ ...form, mode: value });
+                    formInstance.setFieldsValue({ mode: value });
                   }}
                 />
               </Form.Item>
-            )}
+            </div>
+            <div className={styles.formItem}>
+              <Form.Item label="更新版本号" name="updateVersion">
+                <Switch
+                  onChange={(checked) => {
+                    setForm({ ...form, updateVersion: checked });
+                    formInstance.setFieldsValue({ updateVersion: checked });
+                  }}
+                />
+              </Form.Item>
+              {form.updateVersion && (
+                <div className={styles.formItem}>
+                  <Form.Item
+                    label="版本号"
+                    name="version"
+                    rules={[
+                      { required: true, message: "请输入版本号" },
+                      {
+                        pattern: /^\d+\.\d+\.\d+$/,
+                        message: "版本号格式必须为 x.y.z，如 2.5.0",
+                      },
+                    ]}
+                  >
+                    <Input
+                      placeholder="请输入版本号"
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setForm({
+                          ...form,
+                          version: value,
+                        });
+                        // 同步到表单实例
+                        formInstance.setFieldsValue({
+                          version: value,
+                        });
+                      }}
+                    />
+                  </Form.Item>
+                  <Button
+                    type="primary"
+                    onClick={() => handleUpdateVersion()}
+                    loading={updateVersionLoading}
+                  >
+                    执行
+                  </Button>
+                </div>
+              )}
+            </div>
           </Form>
           <Alert
-            message="切换页面会初始化排队状态，上传时建议不要切换页面"
+            message={`切换页面会初始化排队状态，上传时建议不要切换页面。当前等待队列: ${
+              awaitList.length
+            }个，构建中: ${
+              uploadStatus.filter(
+                (item) => item.status === UploadStatus.Building
+              ).length
+            }个`}
             type="warning"
             showIcon
             style={{ marginTop: 10 }}

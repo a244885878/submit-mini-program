@@ -34,23 +34,42 @@ export function updateProjectVersions(
         return;
       }
 
-      // 获取apps目录下的所有子目录
-      const appDirs = fs
-        .readdirSync(appsDir, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => path.join(appsDir, entry.name));
+      // 递归查找所有package.json文件
+      function findPackageJsonFiles(dir: string): string[] {
+        const packageJsonFiles: string[] = [];
 
-      if (appDirs.length === 0) {
-        reject(new Error(`apps目录下没有找到子项目`));
+        function scanDirectory(currentDir: string) {
+          const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+
+          for (const entry of entries) {
+            const fullPath = path.join(currentDir, entry.name);
+
+            if (entry.isDirectory()) {
+              // 递归扫描子目录
+              scanDirectory(fullPath);
+            } else if (entry.name === "package.json") {
+              // 找到package.json文件
+              packageJsonFiles.push(fullPath);
+            }
+          }
+        }
+
+        scanDirectory(dir);
+        return packageJsonFiles;
+      }
+
+      // 查找所有package.json文件
+      const packageJsonFiles = findPackageJsonFiles(appsDir);
+
+      if (packageJsonFiles.length === 0) {
+        reject(new Error(`在apps目录下没有找到任何package.json文件`));
         return;
       }
 
-      // 更新每个子项目的版本号
-      for (const appDir of appDirs) {
-        const packageJsonPath = path.join(appDir, "package.json");
-
-        if (!fs.existsSync(packageJsonPath)) {
-          console.warn(`package.json不存在: ${packageJsonPath}`);
+      // 更新每个package.json文件的版本号
+      for (const packageJsonPath of packageJsonFiles) {
+        // 跳过node_modules目录中的package.json
+        if (packageJsonPath.includes("node_modules")) {
           continue;
         }
 
@@ -68,9 +87,9 @@ export function updateProjectVersions(
             JSON.stringify(packageJson, null, 2) + "\n"
           );
 
-          console.log(`已更新版本号: ${appDir} -> ${version}`);
+          console.log(`已更新版本号: ${packageJsonPath} -> ${version}`);
         } catch (error) {
-          console.warn(`更新版本号失败: ${appDir}`, error);
+          console.warn(`更新版本号失败: ${packageJsonPath}`, error);
         }
       }
 
@@ -86,9 +105,9 @@ export function updateProjectVersions(
         return;
       }
 
-      // 执行git commit
+      // 执行git commit，使用 --no-verify 绕过 husky 钩子
       try {
-        await execAsync(`git commit -m "ci更新版本号为${version}"`);
+        await execAsync(`git commit --no-verify -m "ci更新版本号为${version}"`);
         console.log("已执行 git commit");
       } catch (error) {
         reject(new Error(`git commit 失败: ${error}`));

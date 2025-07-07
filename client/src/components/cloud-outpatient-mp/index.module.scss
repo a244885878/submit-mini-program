@@ -14,5 +14,16 @@
     flex-direction: column;
     overflow: hidden;
     box-sizing: border-box;
+
+    .form {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      .formItem {
+        display: flex;
+        align-items: center;
+      }
+    }
   }
 }

@@ -97,3 +97,17 @@ export const requestGetUploadRecords = (
     params: { page, size, type },
   });
 };
+
+/**
+ * 更新版本号
+ * @param type 小程序类型，默认为 MiniProgramType.CloudOutpatientMp
+ * @param version 版本号
+ */
+export const requestUpdateVersion = (
+  type: string = MiniProgramType.CloudOutpatientMp,
+  version: string
+) => {
+  return request.get("/api/users/update-version", {
+    params: { type, version },
+  });
+};
