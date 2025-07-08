@@ -180,8 +180,8 @@ export function getUploadRecordsCount(
  * @returns Array
  */
 export function getUploadRecords(
-  limit: number = 50,
   offset: number = 0,
+  limit: number = 50,
   type: string = MiniProgramType.CloudOutpatientMp
 ): UploadRecord[] {
   if (!recordsMap[type]) {

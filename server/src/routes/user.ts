@@ -7,7 +7,6 @@ import { pullCode } from "../utils/pull-code";
 import {
   recordUpload,
   getUploadRecords,
-  getUploadRecordsByName,
   getUploadRecordsCount,
 } from "../utils/data-storage";
 import { updateProjectVersions } from "../utils/update-version";
@@ -77,31 +76,21 @@ userRoutes.get("/get-upload-statuses", async (ctx) => {
 // 获取上传记录列表
 userRoutes.get("/get-upload-records", async (ctx) => {
   try {
-    const {
+    let {
       page = 1,
       size = 20,
-      name,
       type = MiniProgramType.CloudOutpatientMp,
     } = ctx.query as unknown as {
-      page?: number;
-      size?: number;
-      name?: string;
+      page?: number | string;
+      size?: number | string;
       type?: string;
     };
-
-    // 计算偏移量
+    page = Number(page) || 1;
+    size = Number(size) || 20;
     const offset = (page - 1) * size;
 
-    let records;
-    let total = 0;
-
-    if (name) {
-      records = getUploadRecordsByName(name, type);
-      total = records.length;
-    } else {
-      records = getUploadRecords(size, offset, type);
-      total = getUploadRecordsCount(type);
-    }
+    const records = getUploadRecords(offset, size, type);
+    const total = getUploadRecordsCount(type);
 
     ctx.body = {
       code: ResponseCode.Success,
