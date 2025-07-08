@@ -1,6 +1,84 @@
 {
   "records": [
     {
+      "id": 88,
+      "name": "@cloud/hai-ou",
+      "orgName": "贵阳海鸥互联网医院云诊室",
+      "lastCommitUser": "liyao",
+      "commit": "ci更新版本号为2.5.0",
+      "uploadTime": "2025-07-08 09:27:33",
+      "mode": "test",
+      "status": "success",
+      "version": "2.5.0",
+      "created_at": "2025-07-08 09:27:33",
+      "type": "cloud-outpatient-mp"
+    },
+    {
+      "id": 87,
+      "name": "@cloud/hua-fu",
+      "orgName": "双流华府医院桃子云诊室",
+      "lastCommitUser": "liyao",
+      "commit": "ci更新版本号为2.5.0",
+      "uploadTime": "2025-07-07 18:26:50",
+      "mode": "test",
+      "status": "success",
+      "version": "2.5.0",
+      "created_at": "2025-07-07 18:26:50",
+      "type": "cloud-outpatient-mp"
+    },
+    {
+      "id": 86,
+      "name": "@cloud/jiu-zhou-zai-xian",
+      "orgName": "九州在线云",
+      "lastCommitUser": "liyao",
+      "commit": "ci更新版本号为2.5.0",
+      "uploadTime": "2025-07-07 18:26:50",
+      "mode": "test",
+      "status": "success",
+      "version": "2.5.0",
+      "created_at": "2025-07-07 18:26:50",
+      "type": "cloud-outpatient-mp"
+    },
+    {
+      "id": 85,
+      "name": "@cloud/hou-li-ping",
+      "orgName": "太原侯丽萍风湿骨病中医院云诊室",
+      "lastCommitUser": "liyao",
+      "commit": "ci更新版本号为2.5.0",
+      "uploadTime": "2025-07-07 18:26:07",
+      "mode": "test",
+      "status": "success",
+      "version": "2.5.0",
+      "created_at": "2025-07-07 18:26:07",
+      "type": "cloud-outpatient-mp"
+    },
+    {
+      "id": 84,
+      "name": "@cloud/hao-yi-duo",
+      "orgName": "好医多互联网医院云诊室",
+      "lastCommitUser": "liyao",
+      "commit": "ci更新版本号为2.5.0",
+      "uploadTime": "2025-07-07 18:26:07",
+      "mode": "test",
+      "status": "success",
+      "version": "2.5.0",
+      "created_at": "2025-07-07 18:26:07",
+      "type": "cloud-outpatient-mp"
+    },
+    {
+      "id": 83,
+      "name": "@cloud/hai-ou",
+      "orgName": "贵阳海鸥互联网医院云诊室",
+      "lastCommitUser": "liyao",
+      "commit": "ci更新版本号为2.5.0",
+      "uploadTime": "2025-07-07 18:26:05",
+      "mode": "test",
+      "status": "success",
+      "version": "2.5.0",
+      "created_at": "2025-07-07 18:26:05",
+      "type": "cloud-outpatient-mp"
+    },
+    {
       "id": 82,
       "name": "@cloud/hua-fu",
       "orgName": "双流华府医院桃子云诊室",
@@ -1055,5 +1133,5 @@
       "created_at": "2025-07-04 15:46:13"
     }
   ],
-  "nextId": 83
+  "nextId": 89
 }
